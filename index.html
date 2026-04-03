@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Zombie Game 🧟‍♂️</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --green: #39ff14;
+      --green-dim: #1a7a00;
+      --red: #ff2200;
+      --blood: #8b0000;
+      --dark: #050f05;
+      --darker: #020802;
+      --panel: rgba(10, 30, 10, 0.85);
+      --glow: 0 0 12px #39ff14, 0 0 30px #39ff1455;
+      --red-glow: 0 0 12px #ff2200, 0 0 30px #ff220055;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--darker);
+      color: var(--green);
+      font-family: 'Share Tech Mono', monospace;
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* ── Animated scanline overlay ── */
+    body::before {
+      content: '';
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(0,0,0,0.18) 3px,
+        rgba(0,0,0,0.18) 4px
+      );
+      z-index: 1000;
+      animation: scanMove 8s linear infinite;
+    }
+
+    @keyframes scanMove {
+      0%   { background-position: 0 0; }
+      100% { background-position: 0 100px; }
+    }
+
+    /* ── Fog / mist ── */
+    .fog {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 220px;
+      background: linear-gradient(to top, rgba(0,40,0,0.45), transparent);
+      pointer-events: none;
+      animation: fogPulse 6s ease-in-out infinite alternate;
+      z-index: 1;
+    }
+
+    @keyframes fogPulse {
+      from { opacity: 0.5; transform: scaleY(1); }
+      to   { opacity: 0.9; transform: scaleY(1.1); }
+    }
+
+    /* ── Floating particles ── */
+    .particles { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+    .particle {
+      position: absolute;
+      width: 3px; height: 3px;
+      border-radius: 50%;
+      background: var(--green);
+      opacity: 0;
+      animation: floatUp var(--dur, 8s) var(--delay, 0s) ease-in infinite;
+    }
+
+    @keyframes floatUp {
+      0%   { opacity: 0; transform: translateY(0) scale(1); }
+      20%  { opacity: 0.6; }
+      80%  { opacity: 0.3; }
+      100% { opacity: 0; transform: translateY(-80vh) scale(0.3); }
+    }
+
+    /* ── Layout ── */
+    .wrapper {
+      position: relative;
+      z-index: 10;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 20px 80px;
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      margin-bottom: 50px;
+      animation: fadeDown 0.8s ease both;
+    }
+
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-30px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .title {
+      font-family: 'Creepster', cursive;
+      font-size: clamp(3rem, 9vw, 6.5rem);
+      letter-spacing: 0.05em;
+      line-height: 1;
+      color: var(--green);
+      text-shadow: var(--glow);
+      animation: titleFlicker 5s step-end infinite;
+    }
+
+    @keyframes titleFlicker {
+      0%, 95%, 100% { opacity: 1; }
+      96%            { opacity: 0.6; }
+      97%            { opacity: 1; }
+      98%            { opacity: 0.4; }
+      99%            { opacity: 1; }
+    }
+
+    .subtitle {
+      margin-top: 8px;
+      font-size: 0.8rem;
+      letter-spacing: 0.25em;
+      color: var(--green-dim);
+      text-transform: uppercase;
+    }
+
+    /* ── Status bar ── */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 30px;
+      padding: 10px 18px;
+      background: var(--panel);
+      border: 1px solid var(--green-dim);
+      border-radius: 4px;
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      animation: fadeDown 0.9s ease 0.1s both;
+    }
+
+    .dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: var(--green-dim);
+      transition: background 0.4s, box-shadow 0.4s;
+    }
+    .dot.online { background: var(--green); box-shadow: var(--glow); animation: pulse 1.8s ease infinite; }
+    .dot.error  { background: var(--red);   box-shadow: var(--red-glow); }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50%       { transform: scale(1.4); }
+    }
+
+    .status-text { flex: 1; }
+    .chain-info  { color: var(--green-dim); font-size: 0.7rem; }
+
+    /* ── Main card ── */
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--green-dim);
+      border-radius: 6px;
+      padding: 32px;
+      margin-bottom: 28px;
+      position: relative;
+      overflow: hidden;
+      animation: fadeUp 0.8s ease 0.2s both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%;
+      width: 60%; height: 1px;
+      background: linear-gradient(to right, transparent, var(--green), transparent);
+      animation: scanLine 4s linear infinite;
+    }
+
+    @keyframes scanLine {
+      0%   { left: -60%; }
+      100% { left: 160%; }
+    }
+
+    .card-title {
+      font-family: 'Creepster', cursive;
+      font-size: 1.5rem;
+      margin-bottom: 20px;
+      text-shadow: var(--glow);
+    }
+
+    /* ── Input group ── */
+    .input-group {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .input-wrap { flex: 1; min-width: 200px; position: relative; }
+
+    .input-label {
+      display: block;
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      color: var(--green-dim);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+
+    input[type="text"], input[type="number"] {
+      width: 100%;
+      background: rgba(0,0,0,0.5);
+      border: 1px solid var(--green-dim);
+      color: var(--green);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.9rem;
+      padding: 10px 14px;
+      border-radius: 3px;
+      outline: none;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+
+    input[type="text"]:focus, input[type="number"]:focus {
+      border-color: var(--green);
+      box-shadow: var(--glow);
+    }
+
+    input::placeholder { color: var(--green-dim); opacity: 0.6; }
+
+    /* ── Class selector ── */
+    .class-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+
+    .class-card {
+      background: rgba(0,0,0,0.4);
+      border: 1px solid var(--green-dim);
+      border-radius: 4px;
+      padding: 12px 8px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.25s, transform 0.2s, box-shadow 0.25s;
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+    }
+
+    .class-card .icon { font-size: 1.8rem; display: block; margin-bottom: 6px; }
+    .class-card:hover { border-color: var(--green); transform: translateY(-3px); box-shadow: var(--glow); }
+    .class-card.active { border-color: var(--green); background: rgba(57,255,20,0.1); box-shadow: var(--glow); }
+
+    /* ── Button ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: transparent;
+      border: 2px solid var(--green);
+      color: var(--green);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.95rem;
+      letter-spacing: 0.15em;
+      padding: 12px 28px;
+      cursor: pointer;
+      border-radius: 3px;
+      text-transform: uppercase;
+      position: relative;
+      overflow: hidden;
+      transition: color 0.3s, box-shadow 0.3s;
+    }
+
+    .btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--green);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.35s ease;
+      z-index: 0;
+    }
+
+    .btn:hover::before  { transform: scaleX(1); }
+    .btn:hover          { color: var(--darker); box-shadow: var(--glow); }
+    .btn span           { position: relative; z-index: 1; }
+    .btn:disabled       { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+    .btn.danger { border-color: var(--red); color: var(--red); }
+    .btn.danger::before { background: var(--red); }
+    .btn.danger:hover { color: #fff; box-shadow: var(--red-glow); }
+
+    /* ── Loading spinner ── */
+    .spinner {
+      display: none;
+      width: 18px; height: 18px;
+      border: 2px solid transparent;
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    .btn.loading .spinner { display: block; }
+    .btn.loading .btn-text::after { content: '...'; animation: dots 1.2s step-end infinite; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes dots {
+      0%,100% { content: ''; }
+      33%      { content: '.'; }
+      66%      { content: '..'; }
+    }
+
+    /* ── Zombie horde ── */
+    .horde-section {
+      animation: fadeUp 0.8s ease 0.35s both;
+    }
+
+    .horde-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .horde-title {
+      font-family: 'Creepster', cursive;
+      font-size: 1.5rem;
+      text-shadow: var(--glow);
+    }
+
+    .horde-count {
+      font-size: 0.75rem;
+      color: var(--green-dim);
+      letter-spacing: 0.1em;
+    }
+
+    .zombie-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 14px;
+    }
+
+    .zombie-card {
+      background: rgba(5, 25, 5, 0.9);
+      border: 1px solid var(--green-dim);
+      border-radius: 5px;
+      padding: 16px 12px;
+      position: relative;
+      overflow: hidden;
+      animation: spawnIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .zombie-card:hover {
+      transform: translateY(-4px) scale(1.02);
+      border-color: var(--green);
+      box-shadow: var(--glow);
+    }
+
+    @keyframes spawnIn {
+      from { opacity: 0; transform: scale(0.5) rotate(-8deg); }
+      to   { opacity: 1; transform: scale(1) rotate(0deg); }
+    }
+
+    .zombie-emoji {
+      font-size: 2.8rem;
+      display: block;
+      text-align: center;
+      margin-bottom: 10px;
+      animation: sway 3s ease-in-out infinite;
+      filter: drop-shadow(0 0 8px rgba(57,255,20,0.4));
+    }
+
+    @keyframes sway {
+      0%, 100% { transform: rotate(-5deg); }
+      50%       { transform: rotate(5deg); }
+    }
+
+    .zombie-name {
+      font-family: 'Creepster', cursive;
+      font-size: 1.05rem;
+      text-align: center;
+      margin-bottom: 8px;
+      word-break: break-word;
+    }
+
+    .zombie-stats {
+      font-size: 0.65rem;
+      color: var(--green-dim);
+      letter-spacing: 0.05em;
+    }
+
+    .zombie-stat { display: flex; justify-content: space-between; margin-bottom: 3px; }
+
+    .stat-bar-wrap {
+      height: 4px;
+      background: rgba(57,255,20,0.15);
+      border-radius: 2px;
+      margin: 6px 0 8px;
+      overflow: hidden;
+    }
+
+    .stat-bar {
+      height: 100%; border-radius: 2px;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      transition: width 1s ease;
+    }
+
+    .zombie-class {
+      display: inline-block;
+      font-size: 0.6rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border: 1px solid var(--green-dim);
+      border-radius: 20px;
+      color: var(--green-dim);
+    }
+
+    .zombie-card .drip {
+      position: absolute;
+      top: 0; right: 12px;
+      width: 6px;
+      background: var(--blood);
+      border-radius: 0 0 4px 4px;
+      animation: drip var(--drip-dur, 3s) var(--drip-delay, 0s) ease-in infinite;
+      opacity: 0;
+    }
+
+    @keyframes drip {
+      0%   { height: 0; opacity: 0.8; top: 0; }
+      70%  { height: 30px; opacity: 0.8; }
+      100% { height: 30px; opacity: 0; top: 30px; }
+    }
+
+    /* ── Toast ── */
+    .toast-container {
+      position: fixed;
+      bottom: 30px; right: 30px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 9999;
+    }
+
+    .toast {
+      background: var(--panel);
+      border: 1px solid var(--green);
+      color: var(--green);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.8rem;
+      padding: 12px 18px;
+      border-radius: 4px;
+      box-shadow: var(--glow);
+      animation: toastIn 0.3s ease both, toastOut 0.3s ease 3.7s both;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .toast.error { border-color: var(--red); color: var(--red); box-shadow: var(--red-glow); }
+
+    @keyframes toastIn  { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+    @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateX(40px); } }
+
+    /* ── Empty state ── */
+    .empty {
+      text-align: center;
+      color: var(--green-dim);
+      padding: 40px 20px;
+      font-size: 0.85rem;
+      letter-spacing: 0.1em;
+      grid-column: 1/-1;
+    }
+
+    .empty .big { font-size: 3rem; display: block; margin-bottom: 10px; opacity: 0.4; }
+
+    /* ── Tx log ── */
+    .tx-log {
+      margin-top: 28px;
+      animation: fadeUp 0.8s ease 0.5s both;
+    }
+
+    .log-title {
+      font-size: 0.75rem;
+      letter-spacing: 0.2em;
+      color: var(--green-dim);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .log-entries {
+      background: rgba(0,0,0,0.5);
+      border: 1px solid var(--green-dim);
+      border-radius: 4px;
+      max-height: 120px;
+      overflow-y: auto;
+      padding: 10px 14px;
+      font-size: 0.72rem;
+      color: var(--green-dim);
+      scrollbar-width: thin;
+      scrollbar-color: var(--green-dim) transparent;
+    }
+
+    .log-entry { margin-bottom: 4px; }
+    .log-entry .ts { color: rgba(57,255,20,0.35); margin-right: 8px; }
+    .log-entry .hash { color: var(--green); }
+    .log-entry.err  { color: var(--red); }
+
+    /* ── Responsive ── */
+    @media (max-width: 500px) {
+      .input-group { flex-direction: column; }
+      .card { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="fog"></div>
+  <div class="particles" id="particles"></div>
+
+  <div class="wrapper">
+    <header>
+      <h1 class="title">🧟 DeadChain</h1>
+      <p class="subtitle">Zombie NFT Summoner &bull; EVM Edition</p>
+    </header>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <div class="dot" id="statusDot"></div>
+      <span class="status-text" id="statusText">CONNECTING TO NODE...</span>
+      <span class="chain-info" id="chainInfo">RPC: 127.0.0.1:8545</span>
+    </div>
+
+    <!-- Summon Card -->
+    <div class="card">
+      <div class="card-title">⚗️ Summon a Zombie</div>
+
+      <div class="input-group">
+        <div class="input-wrap">
+          <label class="input-label">Zombie Name</label>
+          <input type="text" id="zombieName" placeholder="e.g. GoreSlayer" maxlength="32" />
+        </div>
+        <div class="input-wrap" style="max-width:150px">
+          <label class="input-label">Quantity</label>
+          <input type="number" id="zombieQty" value="1" min="1" max="10" />
+        </div>
+      </div>
+
+      <div class="input-label" style="margin-bottom:10px">Choose Class</div>
+      <div class="class-grid" id="classGrid">
+        <div class="class-card active" data-class="Biter">     <span class="icon">🧟</span>Biter</div>
+        <div class="class-card"        data-class="Crawler">   <span class="icon">🦴</span>Crawler</div>
+        <div class="class-card"        data-class="Screamer">  <span class="icon">💀</span>Screamer</div>
+        <div class="class-card"        data-class="Tank">      <span class="icon">🪖</span>Tank</div>
+        <div class="class-card"        data-class="Stalker">   <span class="icon">🌑</span>Stalker</div>
+      </div>
+
+      <button class="btn" id="summonBtn" onclick="createZombie()">
+        <div class="spinner"></div>
+        <span class="btn-text">⚡ Summon</span>
+      </button>
+    </div>
+
+    <!-- Horde -->
+    <div class="horde-section">
+      <div class="horde-header">
+        <div class="horde-title">🧠 Your Horde</div>
+        <span class="horde-count" id="hordeCount">0 zombies</span>
+      </div>
+      <div class="zombie-grid" id="zombieGrid">
+        <div class="empty">
+          <span class="big">🦴</span>
+          No zombies yet. Summon your first undead.
+        </div>
+      </div>
+    </div>
+
+    <!-- TX Log -->
+    <div class="tx-log">
+      <div class="log-title">📡 Transaction Log</div>
+      <div class="log-entries" id="txLog">
+        <div class="log-entry"><span class="ts">--:--:--</span>Awaiting transactions...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <script>
+    // ── Config ──────────────────────────────────────────────────────────────
+    const CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+    const ABI = [
+      {
+        "inputs": [{"internalType":"string","name":"_name","type":"string"}],
+        "name": "createRandomZombie",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      }
+    ];
+
+    const CLASS_EMOJIS = { Biter:'🧟', Crawler:'🦴', Screamer:'💀', Tank:'🪖', Stalker:'🌑' };
+
+    let selectedClass = 'Biter';
+    let zombies = JSON.parse(localStorage.getItem('zd_horde') || '[]');
+    let txLog   = JSON.parse(localStorage.getItem('zd_txlog')  || '[]');
+
+    // ── Particles ──────────────────────────────────────────────────────────
+    (function spawnParticles() {
+      const c = document.getElementById('particles');
+      for (let i = 0; i < 30; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        p.style.cssText = `
+          left: ${Math.random()*100}%;
+          bottom: ${Math.random()*20}%;
+          --dur: ${6 + Math.random()*10}s;
+          --delay: ${Math.random()*8}s;
+          opacity: 0;
+        `;
+        c.appendChild(p);
+      }
+    })();
+
+    // ── Class selector ─────────────────────────────────────────────────────
+    document.getElementById('classGrid').addEventListener('click', e => {
+      const card = e.target.closest('.class-card');
+      if (!card) return;
+      document.querySelectorAll('.class-card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      selectedClass = card.dataset.class;
+    });
+
+    // ── Status ─────────────────────────────────────────────────────────────
+    async function checkNode() {
+      const dot  = document.getElementById('statusDot');
+      const text = document.getElementById('statusText');
+      try {
+        const p = new ethers.providers.JsonRpcProvider("http://127.0.0.1:8545");
+        const net = await p.getNetwork();
+        dot.className = 'dot online';
+        text.textContent = `NODE ONLINE — Chain ID: ${net.chainId}`;
+      } catch {
+        dot.className = 'dot error';
+        text.textContent = 'NODE OFFLINE — Start a local node (Hardhat / Anvil)';
+      }
+    }
+    checkNode();
+
+    // ── Render horde ───────────────────────────────────────────────────────
+    function renderHorde() {
+      const grid = document.getElementById('zombieGrid');
+      document.getElementById('hordeCount').textContent = `${zombies.length} zombie${zombies.length!==1?'s':''}`;
+      if (!zombies.length) {
+        grid.innerHTML = `<div class="empty"><span class="big">🦴</span>No zombies yet. Summon your first undead.</div>`;
+        return;
+      }
+      grid.innerHTML = zombies.map((z, i) => `
+        <div class="zombie-card" style="animation-delay:${i*0.05}s">
+          <div class="drip" style="--drip-dur:${2+Math.random()*3}s;--drip-delay:${Math.random()*4}s"></div>
+          <span class="zombie-emoji">${CLASS_EMOJIS[z.class] || '🧟'}</span>
+          <div class="zombie-name">${z.name}</div>
+          <div class="stat-bar-wrap"><div class="stat-bar" style="width:${z.dna}%"></div></div>
+          <div class="zombie-stats">
+            <div class="zombie-stat"><span>STR</span><span>${z.str}</span></div>
+            <div class="zombie-stat"><span>AGI</span><span>${z.agi}</span></div>
+            <div class="zombie-stat"><span>VIT</span><span>${z.vit}</span></div>
+          </div>
+          <span class="zombie-class">${z.class}</span>
+        </div>
+      `).join('');
+    }
+
+    // ── Render tx log ──────────────────────────────────────────────────────
+    function renderLog() {
+      const el = document.getElementById('txLog');
+      if (!txLog.length) return;
+      el.innerHTML = txLog.slice(-20).reverse().map(l =>
+        `<div class="log-entry ${l.err?'err':''}">
+          <span class="ts">${l.ts}</span>
+          ${l.err ? '✖ ' + l.msg : '✔ <span class="hash">' + l.hash + '</span> — ' + l.msg}
+        </div>`
+      ).join('');
+    }
+
+    function addLog(hash, msg, err=false) {
+      const ts = new Date().toTimeString().slice(0,8);
+      txLog.push({ ts, hash: hash ? hash.slice(0,14)+'…' : '', msg, err });
+      localStorage.setItem('zd_txlog', JSON.stringify(txLog));
+      renderLog();
+    }
+
+    // ── Toast ──────────────────────────────────────────────────────────────
+    function toast(msg, err=false) {
+      const c = document.getElementById('toastContainer');
+      const t = document.createElement('div');
+      t.className = 'toast' + (err ? ' error' : '');
+      t.innerHTML = `<span>${err ? '💀' : '🧟'}</span>${msg}`;
+      c.appendChild(t);
+      setTimeout(() => t.remove(), 4200);
+    }
+
+    // ── Create zombie ──────────────────────────────────────────────────────
+    async function createZombie() {
+      const nameInput = document.getElementById('zombieName');
+      const qty       = parseInt(document.getElementById('zombieQty').value) || 1;
+      const btn       = document.getElementById('summonBtn');
+      const baseName  = nameInput.value.trim() || 'Zombie_' + Math.floor(Math.random()*9999);
+
+      btn.classList.add('loading');
+      btn.disabled = true;
+
+      try {
+        const provider = new ethers.providers.JsonRpcProvider("http://127.0.0.1:8545");
+        const signer   = provider.getSigner();
+        const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+
+        for (let i = 0; i < Math.min(qty, 10); i++) {
+          const zName = qty > 1 ? `${baseName}_${i+1}` : baseName;
+          const tx = await contract.createRandomZombie(zName);
+          addLog(tx.hash, `Summoned "${zName}" (${selectedClass})`);
+          await tx.wait();
+
+          // Local record with pseudo-random stats
+          const seed = Math.random();
+          zombies.unshift({
+            name:  zName,
+            class: selectedClass,
+            dna:   Math.floor(seed * 80 + 15),
+            str:   Math.floor(Math.random()*90 + 10),
+            agi:   Math.floor(Math.random()*90 + 10),
+            vit:   Math.floor(Math.random()*90 + 10),
+          });
+          localStorage.setItem('zd_horde', JSON.stringify(zombies));
+          renderHorde();
+          toast(`🧟 "${zName}" has risen!`);
+        }
+
+        nameInput.value = '';
+      } catch (err) {
+        console.error(err);
+        addLog(null, err.message.slice(0, 60), true);
+        toast('Ritual failed: ' + err.message.slice(0, 60), true);
+      } finally {
+        btn.classList.remove('loading');
+        btn.disabled = false;
+      }
+    }
+
+    // ── Init ───────────────────────────────────────────────────────────────
+    renderHorde();
+    renderLog();
+  </script>
+</body>
+</html>
