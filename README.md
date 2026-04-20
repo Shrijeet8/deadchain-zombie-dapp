@@ -21,11 +21,11 @@
 
 ## 📸 Screenshots
 
-> ![App Screenshot](./screenshots/demo.png)
-> *(Add your screenshot here)*
+### 🏠 Main Interface
+![Main App](./screenshots/b1.png)
 
----
-
+### 🧟 Your Horde
+![Zombie Horde](./screenshots/b2.png)
 ## 🧠 Why this project?
 
 At first glance, creating a "zombie" looks like a simple button click.
